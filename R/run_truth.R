@@ -47,8 +47,8 @@
 #' rm(truth)
 #'
 run_truth <- function(scenario, dir = getwd(),
-                      file_fgs, file_bgm, select_groups, file_init, # file_biolprm, 
-                      file_runprm,
+                      file_fgs, file_bgm, select_groups, file_init, file_biolprm, 
+                      file_runprm = "NEUSv1",
                       #file_fish, 
                       verbose = FALSE, save = TRUE, annage = FALSE){
   
@@ -59,8 +59,15 @@ run_truth <- function(scenario, dir = getwd(),
   bps <- load_bps(dir = dir, fgs = file_fgs, file_init = file_init)
   # Read in the biological parameters
   biol <- load_biolprm(dir = dir, file_biolprm = file_biolprm)
-  # Read in the run parameters
-  runprm <- load_runprm(dir = dir, file_runprm = file_runprm)
+  if(file_runprm == "NEUSv1"){
+    # Use GF's stop-gap function instead
+    runprm <- load_neus_v1_runprm()
+  } else {
+      # Read in the run parameters
+      runprm <- load_runprm(dir = dir, file_runprm = file_runprm)
+    }
+  
+  
   
   nc_catch <- paste0(scenario, 'CATCH.nc')
   dietcheck <- paste0(scenario, 'DietCheck.txt')
@@ -220,6 +227,7 @@ run_truth <- function(scenario, dir = getwd(),
 #   codedate <- system(paste0("grep 'Atlantis SVN' ", logfile), intern = TRUE)
 #   codedate <- as.Date(stringr::str_extract(codedate, "\\d+[- \\/.]\\d+[- \\/.]\\d+"))
 #   if(codedate < "2015-12-15"){
+   if(file_runprm == "NEUSv1"){
       if(verbose) message("Catch numbers correction needed for this codebase, starting")
       # read in initial conditions NC file
       at_init <- RNetCDF::open.nc(con = file.path(dir, file_init))
@@ -244,7 +252,8 @@ run_truth <- function(scenario, dir = getwd(),
         mutate(atoutput = atoutput / (86400 * numlayers)) %>%
         select(species, agecl, polygon, time, atoutput)
       if(verbose) message("Catch numbers corrected")
-#   }else{
+   }
+#      else{
 #     message("Codebase later than December 2015, no correction needed")
 #   }
 # }else{
@@ -290,24 +299,25 @@ run_truth <- function(scenario, dir = getwd(),
 #                                 runprm = runprm)
 # biomass_ages <- calc_biomass_age(nums = nums,
 #                                  resn = resn, structn = structn, biolprm = biol)
-  bio_catch <- calc_biomass_age(nums = catch,
-    resn = resn, structn = structn, biolprm = biol)
-
-  bio_catch <- aggregate(atoutput ~ species + time,
-    data = bio_catch, sum)
+  if(file_runprm == "NEUSv1"){
+    bio_catch <- calc_biomass_age(nums = catch,
+      resn = resn, structn = structn, biolprm = biol)
   
-  # todo: check that the biomass of the catches are correct
-  # also should catch in biomass be exported as well
-  # as catch in numbers?
-  check <- merge(catch_all, bio_catch,
-    by = c("species", "time"))
-  check$check <- with(check, atoutput / catch)
-  
+    bio_catch <- aggregate(atoutput ~ species + time,
+      data = bio_catch, sum)
+    
+    # todo: check that the biomass of the catches are correct
+    # also should catch in biomass be exported as well
+    # as catch in numbers?
+    check <- merge(catch_all, bio_catch,
+      by = c("species", "time"))
+    check$check <- with(check, atoutput / catch)
+  }
   # SKG May 2019, no export of catch in biomass for now
   # does not match catch.txt output file
   # read that in separately instead
   
-  if(!annage){
+  if(file_runprm == "NEUSv1"){
     result <- list(
 #                   "biomass_eaten" = biomass_eaten,
 #                   "biomass_ages" = biomass_ages,
@@ -320,6 +330,15 @@ run_truth <- function(scenario, dir = getwd(),
                    "structn" = structn,
                    "biolprm" = biol,
                    "fgs" = fgs)
+  } else {
+    result <- list(
+      "catch" = catch,
+      "catch_all" = catch_all,
+      "nums" = nums,
+      "resn" = resn,
+      "structn" = structn,
+      "biolprm" = biol,
+      "fgs" = fgs)
   }
   
 # if(annage){
